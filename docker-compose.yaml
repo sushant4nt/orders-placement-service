@@ -1,0 +1,91 @@
+version: '3'
+services:
+  ### PHP-FPM Container
+  php-fpm:
+    container_name: php-fpm
+    build: ./build/php-fpm
+    volumes:
+      - ./:/var/www
+    expose:
+      - "9000"
+    links:
+      - mysql
+    depends_on:
+      - mysql
+    networks:
+      ordernet:
+        ipv4_address: 172.21.0.6
+  
+  ### NGINX Container
+  nginx:
+    container_name: nginx
+    build: ./build/nginx
+    volumes:
+      - ./storage/logs/nginx/:/var/log/nginx
+      - ./:/var/www
+      - ./build/nginx/nginx.conf:/etc/nginx/nginx.conf
+    ports:
+      - "81:80"
+      - "8080:8080"
+      - "444:443"
+    links:
+      - php-fpm
+    networks:
+      ordernet:
+        ipv4_address: 172.21.0.2
+
+  ### MySQL Container
+  mysql:
+    container_name: mysql
+    build: ./build/mysql
+    volumes:
+      - /var/lib/mysql
+    expose:
+      - "3306"
+    volumes:
+    - ./data/mysql/:/var/lib/mysql
+    environment:
+      MYSQL_DATABASE: ${DATABASE_SCHEMA}
+      MYSQL_USER: ${DATABASE_USERNAME}
+      MYSQL_PASSWORD: ${DATABASE_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DATABASE_ROOT_PASSWORD}
+    networks:
+      ordernet:
+        ipv4_address: 172.21.0.3
+
+  ### Application Code Container
+  application:
+    container_name: application
+    build: ./build/application
+    networks:
+      ordernet:
+        ipv4_address: 172.21.0.4
+
+  ### Workspace Utilities Container
+  workspace:
+    container_name: workspace
+    build: ./build/workspace
+    volumes:
+      - ./:/var/www
+      - ./vendor:/var/www/vendor
+      - ./storage:/var/www/storage
+    links:
+      - mysql
+    depends_on:
+      - php-fpm
+      - nginx
+      - mysql
+    tty: true
+    networks:
+      ordernet:
+        ipv4_address: 172.21.0.5
+
+volumes:
+  src:
+
+networks:
+  ordernet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
